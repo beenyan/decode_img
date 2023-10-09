@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "Snowflake",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "tauri": {
     "allowlist": {
@@ -27,6 +27,13 @@
         "message": false,
         "open": true,
         "save": false
+      },
+      "protocol": {
+        "asset": true,
+        "assetScope": ["**"]
+      },
+      "notification": {
+        "all": true
       }
     },
     "bundle": {

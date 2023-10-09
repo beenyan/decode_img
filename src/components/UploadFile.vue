@@ -20,22 +20,26 @@
         @click="SelectIndex = index"
         v-bind:class="{ select: SelectIndex === index }"
       >
-        <div>{{ img.seed }}</div>
-        <img class="encode-img" :src="img.url" alt="img.seed" />
+        <div class="box-title">
+          <div>{{ img.seed }}</div>
+          <div class="close" @click="close(img.src_path)">X</div>
+        </div>
+        <img
+          class="encode-img"
+          :src="img.src_path"
+          :alt="img.seed.toString()"
+        />
       </div>
     </div>
 
     <div class="footer">
       <div class="upload-box">
         <span class="upload-text">Upload Image</span>
-        <input
+        <button
           class="upload-input"
-          type="file"
           name="image and seed"
-          accept=".png"
-          @change="uploadFile"
-          multiple
-        />
+          @click="uploadFile"
+        ></button>
       </div>
     </div>
   </div>
@@ -44,29 +48,14 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/tauri'
-import { ImgDecodedStore, Result } from '../stores/decodedImage'
+import { listen } from '@tauri-apps/api/event'
+import { DialogFilter, OpenDialogOptions, open } from '@tauri-apps/api/dialog'
+import { ImgDecodedStore, Result, Image } from '../stores/decodedImage'
 import { useToast } from 'vue-toast-notification'
 
 const ImgDecoded = ImgDecodedStore()
 const Toast = useToast()
 const SelectIndex = ref(0)
-
-class Image {
-  seed: number
-  url: string
-
-  constructor(seed: number, url: string) {
-    this.seed = seed
-    this.url = url
-  }
-
-  get convert_backend_struct() {
-    return {
-      seed: this.seed,
-      base64: this.url.split(',')[1],
-    }
-  }
-}
 
 const imageList: Array<Image> = reactive([])
 
@@ -87,58 +76,61 @@ function getFileExtension(filename: String) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2)
 }
 
-async function get_url(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const Reader = new FileReader()
-    Reader.onload = (event) => {
-      if (event.target === null || event.target.result === null) return
-      const Url = event.target.result
-      resolve(Url as string)
-    }
-    Reader.onerror = reject
-    Reader.readAsDataURL(file)
-  })
-}
+async function uploadFile() {
+  const filters: DialogFilter[] = [
+    {
+      name: 'Encode Image',
+      extensions: ['png'],
+    },
+  ]
 
-async function uploadFile(file: Event) {
-  const Input = <HTMLInputElement>file.target
-  if (Input.files === null) return
+  const OPTIONS = {
+    title: 'Select Encode Image',
+    filters: filters,
+    multiple: true,
+  } as OpenDialogOptions
+  const FILES = await open(OPTIONS)
+  if (FILES === null) return
 
-  for (const file of Input.files) {
-    if (getFileExtension(file.name) !== 'png') continue
-    const Seed = parseInt(file.name) || 0
-    const Url = await get_url(file)
-
-    imageList.push(new Image(Seed, Url))
+  for (const FILE_PATH of FILES) {
+    if (getFileExtension(FILE_PATH) !== 'png') continue
+    const SEED = await invoke<number>('img_seed_extract', { path: FILE_PATH })
+    imageList.push(new Image(SEED, FILE_PATH))
   }
 }
 
 async function decode(index: number) {
   if (imageList.length === 0) return
 
-  let data = { dataArray: [] as Array<any> }
-  if (index === -1) {
-    console.log('Decode All');
-    
-    data.dataArray = imageList.map((img) => img.convert_backend_struct)
-  } else {
-    console.log(`Decode ${imageList[SelectIndex.value]}`);
-
-    data.dataArray.push(imageList[SelectIndex.value].convert_backend_struct)
+  let data = {
+    dataArray: index === -1 ? imageList : [imageList[SelectIndex.value]],
   }
-
   const dataList = (await invoke<Array<Result>>('img_decode_v2', data)).map(
     (data) => new Result(data)
   )
 
   dataList.forEach((data) => {
     if (data.success) {
-      ImgDecoded.increast(data)
+      ImgDecoded.increast(new Image(data.seed, data.message))
     } else {
       Toast.error(data.message)
     }
   })
 }
+
+async function close(src_path: string) {
+  const INDEX = imageList.findIndex((img) => img.src_path === src_path)
+  if (INDEX === -1) return
+  imageList.splice(INDEX, 1)
+}
+
+listen('tauri://file-drop', async (event) => {
+  for (const FILE_PATH of event.payload as Array<string>) {
+    if (getFileExtension(FILE_PATH) !== 'png') continue
+    const SEED = await invoke<number>('img_seed_extract', { path: FILE_PATH })
+    imageList.push(new Image(SEED, FILE_PATH))
+  }
+})
 </script>
 
 <style scoped>
@@ -178,6 +170,26 @@ async function decode(index: number) {
 
       &.select {
         background-color: var(--image-select-background-color);
+      }
+
+      .box-title {
+        position: relative;
+
+        .close {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 24px;
+          height: 22px;
+          border-radius: 50%;
+          transition: 200ms;
+          line-height: 24px;
+          color: rgb(174, 0, 174);
+
+          &:hover {
+            background-color: rgba(0, 255, 255, 0.2);
+          }
+        }
       }
 
       .encode-img {

@@ -8,10 +8,10 @@ pub struct DecodeInfo<T> {
 }
 
 impl<T: Display> DecodeInfo<T> {
-    pub fn success(base64: T, seed: usize) -> DecodeInfo<String> {
+    pub fn success(data: T, seed: usize) -> DecodeInfo<String> {
         DecodeInfo {
             success: true,
-            message: format!("{base64}"),
+            message: format!("{data}"),
             seed,
         }
     }

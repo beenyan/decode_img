@@ -1,56 +1,29 @@
+use crate::utils::ctm_type::{Png, PngA};
 use crate::utils::error::MyError;
-use base64::{engine::general_purpose, Engine as _};
-use image::{ImageBuffer, Rgba, RgbaImage};
-use std::{io::Cursor, path::PathBuf};
-
-type Png = ImageBuffer<Rgba<u8>, Vec<u8>>;
+use image::ImageBuffer;
+use std::path::PathBuf;
 
 const DIR_CATCH: [(i32, i32); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ImageData {
     pub seed: usize,
-    pub base64: String,
+    pub file_path: PathBuf,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ImageSaveStruct {
     pub filename: String,
-    pub base64: String,
-}
-
-pub fn save_image(base64: &str, path: PathBuf) -> Result<(), MyError> {
-    let img: Png = base64_to_png(base64)?;
-    if let Err(error) = img.save(path) {
-        return Err(MyError::new(&format!("Save Image Error: {error}")));
-    }
-
-    Ok(())
-}
-
-pub fn base64_to_png(base64: &str) -> Result<Png, MyError> {
-    match general_purpose::STANDARD.decode(base64) {
-        Ok(decode_data) => match image::load_from_memory(&decode_data) {
-            Ok(img) => Ok(img.into_rgba8()),
-            Err(error) => Err(MyError::new(&format!("Convert to Image Error: {error}"))),
-        },
-        Err(error) => Err(MyError::new(&format!("Base64 Decode Error: {error}"))),
-    }
-}
-
-pub fn png_to_base64(img: &Png) -> String {
-    let mut buf: Vec<u8> = Vec::new();
-    img.write_to(&mut Cursor::new(&mut buf), image::ImageOutputFormat::Png)
-        .unwrap();
-    general_purpose::STANDARD.encode(&buf)
+    pub file_path: PathBuf,
+    pub dir_path: PathBuf,
 }
 
 /**
  * DecodeV2 Rotate
  */
-fn decode_v2_step1(img: &mut Png) {
+fn decode_v2_step1<T: image::Pixel<Subpixel = u8>>(img: &mut ImageBuffer<T, Vec<T::Subpixel>>) {
     let (width, height) = img.dimensions();
-    let mut new_img: RgbaImage = ImageBuffer::new(width, height);
+    let mut new_img = ImageBuffer::new(width, height);
     let mut border = 0;
     let mut dir = 0;
     let mut pos: (i32, i32) = (0, 0);
@@ -81,7 +54,10 @@ fn decode_v2_step1(img: &mut Png) {
 /**
  * DecodeV2 hash
  */
-fn decode_v2_step2(img: &mut Png, mut seed: usize) -> Result<(), MyError> {
+fn decode_v2_step2<T: image::Pixel<Subpixel = u8>>(
+    img: &mut ImageBuffer<T, Vec<T::Subpixel>>,
+    mut seed: usize,
+) -> Result<(), MyError> {
     let filename = format!("{seed}.png");
     seed = seed >> 1;
     let carry_count = seed % 10;
@@ -116,7 +92,29 @@ fn decode_v2_step2(img: &mut Png, mut seed: usize) -> Result<(), MyError> {
     Ok(())
 }
 
-pub fn decode_v2(img: &mut Png, seed: usize) -> Result<(), MyError> {
+pub fn decode_v2<T: image::Pixel<Subpixel = u8>>(
+    img: &mut ImageBuffer<T, Vec<T::Subpixel>>,
+    seed: usize,
+) -> Result<(), MyError> {
     decode_v2_step1(img);
     decode_v2_step2(img, seed)
+}
+
+pub fn rgba8_to_rgb8(input: &PngA) -> Png {
+    let width = input.width() as usize;
+    let height = input.height() as usize;
+
+    // Get the raw image data as a vector
+    let input: &Vec<u8> = input.as_raw();
+
+    // Allocate a new buffer for the RGB image, 3 bytes per pixel
+    let mut output_data = vec![0u8; width * height * 3];
+
+    for (output, chunk) in output_data.chunks_exact_mut(3).zip(input.chunks_exact(4)) {
+        // ... and copy each of them to output, leaving out the A byte
+        output.copy_from_slice(&chunk[0..3]);
+    }
+
+    // Construct a new image
+    image::ImageBuffer::from_raw(width as u32, height as u32, output_data).unwrap()
 }

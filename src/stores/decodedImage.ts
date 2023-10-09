@@ -1,16 +1,27 @@
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke, convertFileSrc } from '@tauri-apps/api/tauri'
 import { defineStore } from 'pinia'
+
+export class Image {
+  seed: number
+  file_path: string
+  src_path: string
+
+  constructor(seed: number, file_path: string) {
+    this.seed = seed
+    this.file_path = file_path
+    this.src_path = convertFileSrc(file_path)
+  }
+}
 
 class SaveStruct {
   filename: string
-  base64: string
+  file_path: string
+  dir_path: string
 
-  constructor(data: Result, path: string) {
-    const LastCahr = path[path.length - 1]
-    if (LastCahr !== '\\') path += '\\'
-
-    this.filename = `${path}${data.seed}.png`
-    this.base64 = data.message.split(',')[1]
+  constructor(data: Image, path: string) {
+    this.filename = `${data.seed}.png`
+    this.file_path = data.file_path
+    this.dir_path = path;
   }
 }
 
@@ -21,18 +32,15 @@ export class Result {
 
   constructor(data: Result) {
     Object.assign(this, data)
-    if (this.message.length >= 100) {
-      this.message = 'data:image/png;base64,' + this.message
-    }
   }
 }
 
 export const ImgDecodedStore = defineStore('imgDecoded', {
   state: () => {
-    return { imgList: [] as Array<Result> }
+    return { imgList: [] as Array<Image> }
   },
   actions: {
-    increast(data: Result) {
+    increast(data: Image) {
       if (this.imgList.some((img) => img.seed === data.seed)) return
 
       this.imgList.push(data)

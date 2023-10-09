@@ -5,17 +5,11 @@
     </div>
 
     <div class="Link">
-      <span
-        ><a href="https://www.pixiv.net/users/37673370" target="_blank"
-          >Pixiv</a
-        ></span
-      >
+      <span><a href="https://www.pixiv.net/users/37673370" target="_blank">Pixiv</a></span>
       <span> ⭐ </span>
-      <span
-        ><a href="https://www.patreon.com/BeenYan" target="_blank"
-          >Patreon</a
-        ></span
-      >
+      <span><a href="https://ko-fi.com/beenyan" target="_blank">Ko-Fi</a></span>
+      <span> ⭐ </span>
+      <span><a href="https://twitter.com/Been_Yan" target="_blank">X (Twitter)</a></span>
     </div>
 
     <div class="version">

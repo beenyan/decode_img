@@ -11,8 +11,15 @@
         @click="SelectIndex = index"
         v-bind:class="{ select: SelectIndex === index }"
       >
-        <div>{{ img.seed }}</div>
-        <img class="encode-img" :src="img.message" alt="img.seed" />
+        <div class="box-title">
+          <div>{{ img.seed }}</div>
+          <div class="close" @click="close(img.src_path)">X</div>
+        </div>
+        <img
+          class="encode-img"
+          :src="img.src_path"
+          :alt="img.seed.toString()"
+        />
       </div>
     </div>
 
@@ -38,12 +45,12 @@ const Toast = useToast()
 const Count = ref(0)
 
 onMounted(async () => {
-  SavePath.value = await appDataDir()
+  SavePath.value = localStorage.getItem('save_path') || (await appDataDir())
 })
 
 function EasterEggs() {
   if (++Count.value < 10) return
-  Toast.success('Found Easter eggs')
+  Toast.success('Easter eggs')
   Count.value = 0
 }
 
@@ -56,6 +63,7 @@ async function SelectSavePath() {
 
 async function SaveImg() {
   const resultList = await ImgDecoded.saveImage(SavePath.value)
+  localStorage.setItem('save_path', SavePath.value)
 
   for (const result of resultList) {
     if (result.success) {
@@ -64,6 +72,12 @@ async function SaveImg() {
       Toast.error(result.message)
     }
   }
+}
+
+async function close(src_path: string) {
+  const INDEX = ImgDecoded.imgList.findIndex((img) => img.src_path === src_path)
+  if (INDEX === -1) return
+  ImgDecoded.imgList.splice(INDEX, 1)
 }
 </script>
 
@@ -100,6 +114,26 @@ async function SaveImg() {
 
       &.select {
         background-color: var(--image-select-background-color);
+      }
+
+      .box-title {
+        position: relative;
+
+        .close {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 24px;
+          height: 22px;
+          border-radius: 50%;
+          transition: 200ms;
+          line-height: 24px;
+          color: rgb(174, 0, 174);
+
+          &:hover {
+            background-color: rgba(0, 255, 255, 0.2);
+          }
+        }
       }
 
       .encode-img {
